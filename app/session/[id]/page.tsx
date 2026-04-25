@@ -1,4 +1,12 @@
-const boardResponses = [
+import { getCurrentUserSettings, getEffectiveBoardRoles, type BoardRoleName } from "@/app/_data/user-settings";
+
+const boardResponses: {
+  role: BoardRoleName;
+  model: string;
+  summary: string;
+  body: string;
+  stance: string;
+}[] = [
   {
     role: "The Strategist",
     model: "OpenAI",
@@ -56,7 +64,10 @@ const nextActions = [
   "Test whether a staged rollout beats a full six-model launch in early user interviews",
 ];
 
-export default function SessionResultsPage() {
+export default async function SessionResultsPage() {
+  const settings = await getCurrentUserSettings();
+  const activeRoles = getEffectiveBoardRoles(settings);
+  const visibleBoardResponses = boardResponses.filter((response) => activeRoles.includes(response.role));
   return (
     <main className="min-h-screen px-6 py-10 text-white md:px-10 lg:px-12">
       <div className="mx-auto max-w-7xl space-y-8">
@@ -90,12 +101,12 @@ export default function SessionResultsPage() {
                 </div>
                 <div>
                   <p className="text-white/45">Board seats used</p>
-                  <p className="mt-1 font-medium text-white">6 of 6</p>
+                  <p className="mt-1 font-medium text-white">{visibleBoardResponses.length} of 6</p>
                 </div>
                 <div>
                   <p className="text-white/45">Output mode</p>
                   <p className="mt-1 font-medium text-white">
-                    Board memos + synthesis
+                    {settings.defaultTone.join(" + ")}
                   </p>
                 </div>
               </div>
@@ -106,6 +117,7 @@ export default function SessionResultsPage() {
         <section className="grid gap-6 xl:grid-cols-[1.25fr_0.8fr]">
           {/* Left column */}
           <div className="space-y-6">
+            {settings.detailedSynthesis && (
             <section className="rounded-2xl border border-cyan-400/15 bg-[#0A1B2E]/70 p-6 backdrop-blur-sm md:p-8">
               <div className="mb-6">
                 <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-300/80">
@@ -155,6 +167,7 @@ export default function SessionResultsPage() {
                 </div>
               </div>
             </section>
+            )}
 
             <section className="rounded-2xl border border-cyan-400/15 bg-[#0A1B2E]/70 p-6 backdrop-blur-sm md:p-8">
               <div className="mb-6">
@@ -167,7 +180,7 @@ export default function SessionResultsPage() {
               </div>
 
               <div className="space-y-4">
-                {boardResponses.map((response) => (
+                {visibleBoardResponses.map((response) => (
                   <article
                     key={response.role}
                     className="rounded-2xl border border-white/10 bg-white/5 p-5"
@@ -203,6 +216,7 @@ export default function SessionResultsPage() {
 
           {/* Right column */}
           <aside className="space-y-6">
+            {settings.disagreementScore && (
             <section className="rounded-2xl border border-cyan-400/15 bg-[#0A1B2E]/70 p-6 backdrop-blur-sm">
               <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-300/80">
                 Tension analysis
@@ -222,6 +236,7 @@ export default function SessionResultsPage() {
                 ))}
               </div>
             </section>
+            )}
 
             <section className="rounded-2xl border border-cyan-400/15 bg-[#0A1B2E]/70 p-6 backdrop-blur-sm">
               <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-300/80">

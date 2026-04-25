@@ -1,3 +1,6 @@
+import { getCurrentUserSettings, getEffectiveBoardRoles } from "@/app/_data/user-settings";
+import Link from "next/link";
+
 const sessions = [
   {
     id: "1",
@@ -29,9 +32,9 @@ const sessions = [
   },
 ];
 
-import Link from "next/link";
-
-export default function HistoryPage() {
+export default async function HistoryPage() {
+  const settings = await getCurrentUserSettings();
+  const defaultBoardSeats = getEffectiveBoardRoles(settings).length;
   return (
     <main className="min-h-screen px-6 py-10 text-white md:px-10 lg:px-12">
       <div className="mx-auto max-w-7xl space-y-8">
@@ -78,7 +81,7 @@ export default function HistoryPage() {
 
         {/* Sessions list */}
         <section className="space-y-4">
-          {sessions.map((session) => (
+          {sessions.map((session, index) => (
             <Link
               key={session.id}
               href={`/session/${session.id}`}
@@ -91,7 +94,7 @@ export default function HistoryPage() {
                     {session.title}
                   </h2>
                   <p className="mt-1 text-sm text-white/60">
-                    {session.meta}
+                    {index === 0 ? `Product Strategy • ${defaultBoardSeats} board members • ${settings.defaultTone.join(" + ")}` : session.meta}
                   </p>
 
                   <div className="mt-3 flex items-center gap-3 text-xs text-white/50">

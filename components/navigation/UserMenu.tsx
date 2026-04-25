@@ -17,9 +17,21 @@ type UserMenuProps = {
   mobile?: boolean;
 };
 
+type SessionUser = {
+  email: string | null;
+  name: string | null;
+  avatarUrl: string | null;
+};
+
+const CENTRAL_PASSWORD_URL = "https://entrepreneuria.io/settings/password";
+
 export default function UserMenu({ mobile = false }: UserMenuProps) {
   const [open, setOpen] = useState(false);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const displayName = user?.name ?? user?.email?.split("@")[0] ?? "Misti";
+  const displayEmail = user?.email ?? "founder@entrepreneuria.io";
+  const compactDetail = user?.email ?? "Founder Pro";
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -43,6 +55,38 @@ export default function UserMenu({ mobile = false }: UserMenuProps) {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSession() {
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store" });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as { user?: SessionUser | null };
+
+        if (isMounted) {
+          setUser(payload.user ?? null);
+        }
+      } catch {
+        // Keep the existing static account fallback when the session endpoint is unavailable.
+      }
+    }
+
+    void loadSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  function handleSignOut() {
+    window.location.href = "/logout";
+  }
+
   if (mobile) {
     return (
       <div className="relative" ref={menuRef}>
@@ -63,12 +107,10 @@ export default function UserMenu({ mobile = false }: UserMenuProps) {
                 Your account
               </p>
               <div className="mt-3 flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
-                  <User size={18} />
-                </div>
+                <Avatar avatarUrl={user?.avatarUrl} size="large" />
                 <div>
-                  <p className="text-sm font-semibold text-white">Misti</p>
-                  <p className="text-sm text-white/55">Founder Pro</p>
+                  <p className="text-sm font-semibold text-white">{displayName}</p>
+                  <p className="text-sm text-white/55">{compactDetail}</p>
                 </div>
               </div>
             </div>
@@ -109,7 +151,7 @@ export default function UserMenu({ mobile = false }: UserMenuProps) {
                   label="Model Preferences"
                 />
                 <MenuLink
-                  href="/settings/password"
+                  href={CENTRAL_PASSWORD_URL}
                   icon={<Lock size={16} />}
                   label="Update Password"
                 />
@@ -124,6 +166,7 @@ export default function UserMenu({ mobile = false }: UserMenuProps) {
 
               <button
                 type="button"
+                onClick={handleSignOut}
                 className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-white/65 transition hover:bg-white/5 hover:text-white"
               >
                 <span className="flex items-center gap-3">
@@ -148,13 +191,11 @@ export default function UserMenu({ mobile = false }: UserMenuProps) {
         aria-label="Open user menu"
         aria-expanded={open}
       >
-        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
-          <User size={16} />
-        </div>
+        <Avatar avatarUrl={user?.avatarUrl} size="small" />
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-white">Misti</p>
-          <p className="truncate text-xs text-white/55">Founder Pro</p>
+          <p className="truncate text-sm font-semibold text-white">{displayName}</p>
+          <p className="truncate text-xs text-white/55">{compactDetail}</p>
         </div>
 
         <ChevronUp
@@ -172,12 +213,10 @@ export default function UserMenu({ mobile = false }: UserMenuProps) {
               Your account
             </p>
             <div className="mt-3 flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
-                <User size={18} />
-              </div>
+              <Avatar avatarUrl={user?.avatarUrl} size="large" />
               <div>
-                <p className="text-sm font-semibold text-white">Misti</p>
-                <p className="text-sm text-white/55">founder@entrepreneuria.io</p>
+                <p className="text-sm font-semibold text-white">{displayName}</p>
+                <p className="text-sm text-white/55">{displayEmail}</p>
               </div>
             </div>
           </div>
@@ -216,7 +255,7 @@ export default function UserMenu({ mobile = false }: UserMenuProps) {
                 label="Model Preferences"
               />
               <MenuLink
-                href="/settings/password"
+                href={CENTRAL_PASSWORD_URL}
                 icon={<Lock size={16} />}
                 label="Update Password"
               />
@@ -231,6 +270,7 @@ export default function UserMenu({ mobile = false }: UserMenuProps) {
 
             <button
               type="button"
+              onClick={handleSignOut}
               className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-white/65 transition hover:bg-white/5 hover:text-white"
             >
               <span className="flex items-center gap-3">
@@ -241,6 +281,30 @@ export default function UserMenu({ mobile = false }: UserMenuProps) {
             </button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function Avatar({
+  avatarUrl,
+  size,
+}: {
+  avatarUrl: string | null | undefined;
+  size: "small" | "large";
+}) {
+  const dimensions = size === "small" ? "h-10 w-10" : "h-11 w-11";
+  const iconSize = size === "small" ? 16 : 18;
+
+  return (
+    <div
+      className={`flex ${dimensions} items-center justify-center overflow-hidden rounded-full border border-cyan-300/25 bg-cyan-300/10 text-cyan-200`}
+    >
+      {avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <User size={iconSize} />
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getCurrentUserSettings } from "@/app/_data/user-settings";
 
 const boardMembers = [
   {
@@ -25,7 +26,7 @@ const boardMembers = [
     title: "The Contrarian",
     desc: "Challenges consensus and pressure-tests the obvious answer.",
   },
-];
+] as const;
 
 const decisionTypes = [
   "Product Strategy",
@@ -56,7 +57,9 @@ const outputStyles = [
   "Debate + Consensus View",
 ];
 
-export default function NewSessionPage() {
+export default async function NewSessionPage() {
+  const settings = await getCurrentUserSettings();
+
   return (
     <main className="min-h-screen px-6 py-10 text-white md:px-10 lg:px-12">
       <div className="mx-auto max-w-7xl space-y-8">
@@ -233,7 +236,7 @@ export default function NewSessionPage() {
 
                       <input
                         type="checkbox"
-                        defaultChecked
+                        defaultChecked={settings.activeBoardRoles.includes(member.title)}
                         className="mt-1 h-4 w-4 rounded border-white/20 bg-transparent accent-cyan-300"
                       />
                     </div>
@@ -259,7 +262,7 @@ export default function NewSessionPage() {
                     Response mode
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
-                    Individual board memos + synthesis
+                    {settings.defaultTone.join(" + ")}
                   </p>
                 </div>
 
@@ -268,7 +271,7 @@ export default function NewSessionPage() {
                     Tension detection
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
-                    Enabled
+                    {settings.disagreementScore ? "Enabled" : "Disabled"}
                   </p>
                 </div>
 
@@ -277,7 +280,7 @@ export default function NewSessionPage() {
                     Consensus summary
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
-                    Enabled
+                    {settings.detailedSynthesis ? "Enabled" : "Disabled"}
                   </p>
                 </div>
 
@@ -286,7 +289,7 @@ export default function NewSessionPage() {
                     Provider mode
                   </p>
                   <p className="mt-2 text-sm font-medium text-white">
-                    Mock orchestration for now
+                    {settings.enabledModels.length} default models enabled
                   </p>
                 </div>
               </div>
@@ -302,8 +305,8 @@ export default function NewSessionPage() {
 
               <ul className="mt-5 space-y-3 text-sm leading-6 text-white/70">
                 <li>• One response from each selected board member</li>
-                <li>• Strategic consensus summary</li>
-                <li>• Tension / disagreement analysis</li>
+                {settings.detailedSynthesis && <li>• Strategic consensus summary</li>}
+                {settings.disagreementScore && <li>• Tension / disagreement analysis</li>}
                 <li>• Recommended next steps</li>
                 <li>• Founder decision prompt</li>
               </ul>

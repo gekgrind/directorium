@@ -1,3 +1,6 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ChevronRight,
@@ -9,28 +12,118 @@ import {
   User,
   Waypoints,
 } from "lucide-react";
+import {
+  ALL_TONE_OPTIONS,
+  getCurrentUserSettings,
+} from "@/app/_data/user-settings";
 
-const preferredModels = [
-  "OpenAI",
-  "Claude",
-  "Gemini",
-  "Grok",
-  "Perplexity",
-  "Mistral",
-];
+type SettingsDefaults = {
+  autoContrarian?: boolean;
+  autoExport?: boolean;
+  detailedSynthesis?: boolean;
+  disagreementScore?: boolean;
+};
 
-const boardRoles = [
-  "The Strategist",
-  "The Capitalist",
-  "The Growth Architect",
-  "The Operator",
-  "The Risk Analyst",
-  "The Contrarian",
-];
+type SettingsData = {
+  enabledModels?: string[];
+  defaultTone?: string[] | string;
+  activeBoardRoles?: string[];
+  defaultExportOptions?: string[];
+  defaults?: SettingsDefaults;
+  autoContrarian?: boolean;
+  autoExport?: boolean;
+  detailedSynthesis?: boolean;
+  disagreementScore?: boolean;
+};
 
-const exportFormats = ["PDF Brief", "Markdown", "Notion Export", "CSV Summary"];
+const EMPTY_SETTINGS: SettingsData = {
+  enabledModels: [],
+  defaultTone: [],
+  activeBoardRoles: [],
+  defaultExportOptions: [],
+  defaults: {
+    autoContrarian: false,
+    autoExport: false,
+    detailedSynthesis: false,
+    disagreementScore: false,
+  },
+};
 
 export default function SettingsPage() {
+  const [settings, setSettings] = useState<SettingsData>(EMPTY_SETTINGS);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setSaveSuccess(null);
+
+    try {
+      const result = (await getCurrentUserSettings()) as
+        | SettingsData
+        | null
+        | undefined;
+      setSettings(result ?? EMPTY_SETTINGS);
+    } catch (error) {
+      console.error("Failed to load settings:", error);
+      setLoadError("Unable to load settings right now.");
+      setSettings(EMPTY_SETTINGS);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const save = useCallback(async () => {
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(null);
+
+    try {
+      // TODO: Replace with real save logic when backend wiring is ready.
+      await Promise.resolve();
+      setSaveSuccess("Settings saved successfully.");
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      setSaveError("Unable to save settings right now.");
+    } finally {
+      setIsSaving(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const normalizedDefaults = useMemo(
+    () => ({
+      autoContrarian:
+        settings.defaults?.autoContrarian ?? settings.autoContrarian ?? false,
+      autoExport: settings.defaults?.autoExport ?? settings.autoExport ?? false,
+      detailedSynthesis:
+        settings.defaults?.detailedSynthesis ??
+        settings.detailedSynthesis ??
+        false,
+      disagreementScore:
+        settings.defaults?.disagreementScore ??
+        settings.disagreementScore ??
+        false,
+    }),
+    [settings]
+  );
+
+  const enabledModels = settings.enabledModels ?? [];
+  const activeBoardRoles = settings.activeBoardRoles ?? [];
+  const defaultExportOptions = settings.defaultExportOptions ?? [];
+  const defaultTone = Array.isArray(settings.defaultTone)
+    ? settings.defaultTone
+    : settings.defaultTone
+      ? [settings.defaultTone]
+      : [];
+
   return (
     <div className="mx-auto max-w-7xl space-y-8 text-white">
       <header className="rounded-2xl border border-cyan-400/15 bg-[#0A1B2E]/70 p-6 backdrop-blur-sm md:p-8">
@@ -52,22 +145,35 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/billing"
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#061426] transition hover:shadow-[0_0_30px_rgba(103,232,249,0.25)]"
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={isLoading || isSaving}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#061426] transition hover:shadow-[0_0_30px_rgba(103,232,249,0.25)] disabled:opacity-70"
             >
-              Upgrade Plan
-              <Sparkles size={16} />
-            </Link>
+              {isSaving ? "Saving..." : "Save Settings"}
+            </button>
 
-            <Link
-              href="/settings/password"
-              className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/80 transition hover:border-cyan-300/30 hover:text-cyan-200"
+            <button
+              type="button"
+              onClick={() => void reload()}
+              disabled={isLoading || isSaving}
+              className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/80 transition hover:border-cyan-300/30 hover:text-cyan-200 disabled:opacity-70"
             >
-              Update Password
-            </Link>
+              {isLoading ? "Loading..." : "Reload Settings"}
+            </button>
           </div>
         </div>
+
+        {loadError ? (
+          <p className="mt-4 text-sm text-red-300">{loadError}</p>
+        ) : null}
+        {saveError ? (
+          <p className="mt-4 text-sm text-red-300">{saveError}</p>
+        ) : null}
+        {saveSuccess ? (
+          <p className="mt-4 text-sm text-cyan-200">{saveSuccess}</p>
+        ) : null}
       </header>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -120,7 +226,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              {preferredModels.map((model) => (
+              {enabledModels.map((model) => (
                 <span
                   key={model}
                   className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-medium text-cyan-100"
@@ -133,15 +239,27 @@ export default function SettingsPage() {
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <PreferenceCard
                 title="Response depth"
-                value="Strategic and detailed"
+                value={
+                  normalizedDefaults.detailedSynthesis
+                    ? "Strategic and detailed"
+                    : "Strategic"
+                }
               />
               <PreferenceCard
                 title="Debate intensity"
-                value="High tension enabled"
+                value={
+                  normalizedDefaults.autoContrarian
+                    ? "High tension enabled"
+                    : "Balanced"
+                }
               />
               <PreferenceCard
                 title="Consensus style"
-                value="Consensus + Contrarian"
+                value={
+                  normalizedDefaults.autoContrarian
+                    ? "Consensus + Contrarian"
+                    : "Consensus only"
+                }
               />
               <PreferenceCard
                 title="Decision framing"
@@ -168,13 +286,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {[
-                    "Direct",
-                    "Strategic",
-                    "Supportive",
-                    "Analytical",
-                    "Contrarian",
-                  ].map((tone) => (
+                  {ALL_TONE_OPTIONS.map((tone) => (
                     <span
                       key={tone}
                       className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/75"
@@ -185,7 +297,12 @@ export default function SettingsPage() {
                 </div>
 
                 <p className="mt-4 text-sm leading-6 text-white/65">
-                  Current default: <span className="text-white">Strategic + Direct</span>
+                  Current default:{" "}
+                  <span className="text-white">
+                    {defaultTone.length > 0
+                      ? defaultTone.join(" + ")
+                      : "None selected"}
+                  </span>
                 </p>
               </div>
 
@@ -196,7 +313,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  {boardRoles.map((role) => (
+                  {activeBoardRoles.map((role) => (
                     <div
                       key={role}
                       className="flex items-center justify-between rounded-xl border border-white/10 bg-[#081624] px-4 py-3"
@@ -223,7 +340,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {exportFormats.map((format) => (
+              {defaultExportOptions.map((format) => (
                 <div
                   key={format}
                   className="rounded-2xl border border-white/10 bg-white/5 p-5"
@@ -282,7 +399,7 @@ export default function SettingsPage() {
 
             <div className="mt-5 space-y-3">
               <ActionRow
-                href="/settings/password"
+                href="https://entrepreneuria.io/settings/password"
                 icon={<Lock size={16} />}
                 title="Update password"
                 subtitle="Change your password and review account access."
@@ -305,19 +422,19 @@ export default function SettingsPage() {
             <div className="mt-5 space-y-3">
               <ToggleRow
                 label="Auto-include Contrarian"
-                value="On"
+                value={normalizedDefaults.autoContrarian ? "On" : "Off"}
               />
               <ToggleRow
                 label="Export summary after each session"
-                value="Off"
+                value={normalizedDefaults.autoExport ? "On" : "Off"}
               />
               <ToggleRow
                 label="Default to detailed synthesis"
-                value="On"
+                value={normalizedDefaults.detailedSynthesis ? "On" : "Off"}
               />
               <ToggleRow
                 label="Show model disagreement score"
-                value="On"
+                value={normalizedDefaults.disagreementScore ? "On" : "Off"}
               />
             </div>
           </section>
@@ -360,7 +477,7 @@ function ActionRow({
   subtitle,
 }: {
   href: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   subtitle: string;
 }) {
@@ -386,14 +503,20 @@ function ActionRow({
 function ToggleRow({
   label,
   value,
+  onClick,
 }: {
   label: string;
   value: "On" | "Off";
+  onClick?: () => void;
 }) {
   const isOn = value === "On";
 
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+    >
       <span className="text-sm text-white/85">{label}</span>
       <span
         className={`rounded-full px-3 py-1 text-xs font-medium ${
@@ -404,6 +527,6 @@ function ToggleRow({
       >
         {value}
       </span>
-    </div>
+    </button>
   );
 }

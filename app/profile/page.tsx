@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronRight,
   CreditCard,
@@ -9,6 +12,12 @@ import {
   User,
   Waypoints,
 } from "lucide-react";
+import {
+  defaultCurrentUserProfile,
+  fetchCurrentUserProfile,
+  saveCurrentUserProfile,
+  type UserProfile,
+} from "@/lib/profile-store";
 
 const preferredModels = [
   "OpenAI",
@@ -30,7 +39,143 @@ const boardRoles = [
 
 const exportFormats = ["PDF Brief", "Markdown", "Notion Export", "CSV Summary"];
 
+type ProfileFormState = {
+  fullName: string;
+  email: string;
+  workspace: string;
+  role: string;
+};
+
+type ValidationErrors = Partial<Record<keyof ProfileFormState, string>>;
+
+function toFormState(profile: UserProfile): ProfileFormState {
+  return {
+    fullName: profile.fullName,
+    email: profile.email,
+    workspace: profile.workspace,
+    role: profile.role,
+  };
+}
+
+function validateProfileForm(form: ProfileFormState): ValidationErrors {
+  const errors: ValidationErrors = {};
+
+  if (form.fullName.trim().length < 2) {
+    errors.fullName = "Full name must be at least 2 characters.";
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    errors.email = "Please enter a valid email address.";
+  }
+
+  if (form.workspace.trim().length < 2) {
+    errors.workspace = "Workspace must be at least 2 characters.";
+  }
+
+  if (form.role.trim().length < 2) {
+    errors.role = "Role must be at least 2 characters.";
+  }
+
+  return errors;
+}
+
 export default function SettingsPage() {
+  const [savedProfile, setSavedProfile] = useState<UserProfile>(
+    defaultCurrentUserProfile,
+  );
+  const [form, setForm] = useState<ProfileFormState>(
+    toFormState(defaultCurrentUserProfile),
+  );
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadProfile() {
+      setLoadingProfile(true);
+      const profile = await fetchCurrentUserProfile();
+
+      if (!mounted) {
+        return;
+      }
+
+      setSavedProfile(profile);
+      setForm(toFormState(profile));
+      setLoadingProfile(false);
+    }
+
+    void loadProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const isDirty = useMemo(
+    () =>
+      form.fullName !== savedProfile.fullName ||
+      form.email !== savedProfile.email ||
+      form.workspace !== savedProfile.workspace ||
+      form.role !== savedProfile.role,
+    [form, savedProfile],
+  );
+
+  function handleFieldChange(field: keyof ProfileFormState, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+    if (formError) {
+      setFormError(null);
+    }
+    if (formSuccess) {
+      setFormSuccess(null);
+    }
+  }
+
+  function handleCancel() {
+    setForm(toFormState(savedProfile));
+    setErrors({});
+    setFormError(null);
+    setFormSuccess(null);
+  }
+
+  async function handleSave() {
+    const validationErrors = validateProfileForm(form);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      setFormError("Please fix the highlighted fields before saving.");
+      setFormSuccess(null);
+      return;
+    }
+
+    setSavingProfile(true);
+    setErrors({});
+    setFormError(null);
+
+    const nextProfile: UserProfile = {
+      fullName: form.fullName.trim(),
+      email: form.email.trim(),
+      workspace: form.workspace.trim(),
+      role: form.role.trim(),
+    };
+
+    try {
+      const updatedProfile = await saveCurrentUserProfile(nextProfile);
+      setSavedProfile(updatedProfile);
+      setForm(toFormState(updatedProfile));
+      setFormSuccess("Profile updated successfully.");
+    } catch {
+      setFormError("We couldn't save your profile. Please try again.");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-8 text-white">
       <header className="rounded-2xl border border-cyan-400/15 bg-[#0A1B2E]/70 p-6 backdrop-blur-sm md:p-8">
@@ -61,7 +206,7 @@ export default function SettingsPage() {
             </Link>
 
             <Link
-              href="/settings/password"
+              href="https://entrepreneuria.io/settings/password"
               className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/80 transition hover:border-cyan-300/30 hover:text-cyan-200"
             >
               Update Password
@@ -87,22 +232,72 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <InfoCard label="Name" value="Misti" />
-              <InfoCard label="Email" value="founder@entrepreneuria.io" />
-              <InfoCard label="Workspace" value="Entrepreneuria" />
-              <InfoCard label="Role" value="Founder" />
-            </div>
+            {loadingProfile ? (
+              <p className="text-sm text-white/70">Loading profile…</p>
+            ) : (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <EditableInfoCard
+                    label="Name"
+                    value={form.fullName}
+                    onChange={(value) => handleFieldChange("fullName", value)}
+                    error={errors.fullName}
+                  />
+                  <EditableInfoCard
+                    label="Email"
+                    value={form.email}
+                    onChange={(value) => handleFieldChange("email", value)}
+                    error={errors.email}
+                    type="email"
+                  />
+                  <EditableInfoCard
+                    label="Workspace"
+                    value={form.workspace}
+                    onChange={(value) => handleFieldChange("workspace", value)}
+                    error={errors.workspace}
+                  />
+                  <EditableInfoCard
+                    label="Role"
+                    value={form.role}
+                    onChange={(value) => handleFieldChange("role", value)}
+                    error={errors.role}
+                  />
+                </div>
 
-            <div className="mt-6">
-              <Link
-                href="/profile"
-                className="inline-flex items-center gap-2 text-sm font-medium text-cyan-300 transition hover:text-cyan-200"
-              >
-                Manage profile
-                <ChevronRight size={16} />
-              </Link>
-            </div>
+                {(formError || formSuccess) && (
+                  <p
+                    className={`mt-4 text-sm ${
+                      formError ? "text-rose-300" : "text-cyan-200"
+                    }`}
+                    role="status"
+                  >
+                    {formError ?? formSuccess}
+                  </p>
+                )}
+
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#061426] transition hover:shadow-[0_0_30px_rgba(103,232,249,0.25)] disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => {
+                      void handleSave();
+                    }}
+                    disabled={savingProfile || !isDirty}
+                  >
+                    {savingProfile ? "Saving…" : "Save Changes"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/80 transition hover:border-cyan-300/30 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={handleCancel}
+                    disabled={savingProfile || !isDirty}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
           </section>
 
           <section className="rounded-2xl border border-cyan-400/15 bg-[#0A1B2E]/70 p-6 backdrop-blur-sm md:p-8">
@@ -282,7 +477,7 @@ export default function SettingsPage() {
 
             <div className="mt-5 space-y-3">
               <ActionRow
-                href="/settings/password"
+                href="https://entrepreneuria.io/settings/password"
                 icon={<Lock size={16} />}
                 title="Update password"
                 subtitle="Change your password and review account access."
@@ -327,13 +522,32 @@ export default function SettingsPage() {
   );
 }
 
-function InfoCard({ label, value }: { label: string; value: string }) {
+function EditableInfoCard({
+  label,
+  value,
+  onChange,
+  error,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  type?: "text" | "email";
+}) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
       <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300/75">
         {label}
       </p>
-      <p className="mt-2 text-base font-medium text-white">{value}</p>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full bg-transparent text-base font-medium text-white outline-none placeholder:text-white/35"
+        aria-invalid={Boolean(error)}
+      />
+      {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
     </div>
   );
 }

@@ -24,3 +24,23 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes board-pulse {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes board-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes board-data-pulse {
+  0%, 100% { opacity: 0.18; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes board-core-glow {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}

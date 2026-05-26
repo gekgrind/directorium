@@ -26,7 +26,14 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(buildCentralLoginUrl(request.nextUrl.toString()));
+  // Build the callback URL from the declared public origin so the Entrepreneuria
+  // login page always receives the trusted HTTPS URL regardless of whether the
+  // deployment's reverse proxy forwards x-forwarded-proto correctly.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const callbackUrl = appUrl
+    ? new URL(request.nextUrl.pathname + request.nextUrl.search, appUrl).toString()
+    : request.nextUrl.toString();
+  return NextResponse.redirect(buildCentralLoginUrl(callbackUrl));
 }
 
 export const config = {

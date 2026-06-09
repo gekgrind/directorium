@@ -176,9 +176,9 @@ function ArcLines({
     const opacity = 0.2 + 0.5 * Math.abs(Math.sin((t / 4) * Math.PI * 2));
     if (groupRef.current) {
       groupRef.current.children.forEach((child) => {
-        const mesh = child as THREE.Mesh;
-        if (mesh.material instanceof THREE.MeshStandardMaterial) {
-          mesh.material.opacity = opacity;
+        const lineObj = child as THREE.Line;
+        if (lineObj.material instanceof THREE.LineBasicMaterial) {
+          lineObj.material.opacity = opacity;
         }
       });
     }

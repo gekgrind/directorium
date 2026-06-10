@@ -10,6 +10,13 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function proxy(request: NextRequest) {
+  // The shared auth cookie is scoped to .entrepreneuria.io and is never sent
+  // to localhost, so skip the guard in local development.
+  const { hostname } = request.nextUrl;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return NextResponse.next();
+  }
+
   const accessToken = parseSharedSupabaseAccessToken(
     request.cookies.get(SHARED_AUTH_COOKIE_NAME)?.value,
   );

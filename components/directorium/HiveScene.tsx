@@ -8,13 +8,10 @@ import {
   type BoardMemberSplineName,
 } from "./board-members";
 
-const Spline = dynamic(
-  () => import("@splinetool/react-spline/next"),
-  {
-    ssr: false,
-    loading: () => <SceneSkeleton />,
-  },
-);
+const Spline = dynamic(() => import("@splinetool/react-spline"), {
+  ssr: false,
+  loading: () => <SceneSkeleton />,
+});
 
 const SCENE_URL =
   "https://prod.spline.design/N5U3zPEEuVA6yauh/scene.splinecode";

@@ -20,6 +20,7 @@ const geistMono = Geist_Mono({
 
 function getPageLabel(pathname: string) {
   if (pathname === "/") return "Dashboard";
+  if (pathname === "/directorium") return "Directorium";
   if (pathname === "/new-session") return "New Session";
   if (pathname === "/history") return "History";
   if (pathname.startsWith("/session/")) return "Session Results";

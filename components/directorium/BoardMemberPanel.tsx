@@ -2,18 +2,19 @@
 
 import { useEffect } from "react";
 import type { BoardMember } from "./board-members";
-import { useBoardMemberOutput } from "@/lib/directorium/use-board-member-output";
+import type { BoardMemberOutputState } from "@/lib/directorium/use-board-member-output";
 
 type BoardMemberPanelProps = {
   member: BoardMember | null;
+  output: BoardMemberOutputState;
   onClose: () => void;
 };
 
 export default function BoardMemberPanel({
   member,
+  output,
   onClose,
 }: BoardMemberPanelProps) {
-  const output = useBoardMemberOutput(member?.splineName ?? null);
 
   useEffect(() => {
     if (!member) return;

@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import type { SplineEvent } from "@splinetool/react-spline";
+import type { Application } from "@splinetool/runtime";
 import {
   isBoardMemberName,
   type BoardMemberSplineName,
 } from "./board-members";
+import NeuralPathways, { type MemberActivity } from "./NeuralPathways";
+import {
+  hideLegacyPathMeshes,
+  startTorusAnimation,
+} from "@/lib/directorium/hive-scene-effects";
 
 const Spline = dynamic(() => import("@splinetool/react-spline"), {
   ssr: false,
@@ -17,15 +23,25 @@ const SCENE_URL =
   "https://prod.spline.design/N5U3zPEEuVA6yauh/scene.splinecode";
 
 type HiveSceneProps = {
+  activeMember: BoardMemberSplineName | null;
+  memberActivity: MemberActivity;
   onMemberClick: (name: BoardMemberSplineName) => void;
   onDeselect: () => void;
 };
 
 export default function HiveScene({
+  activeMember,
+  memberActivity,
   onMemberClick,
   onDeselect,
 }: HiveSceneProps) {
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [app, setApp] = useState<Application | null>(null);
+
+  useEffect(() => {
+    if (!app) return;
+    hideLegacyPathMeshes(app);
+    return startTorusAnimation(app);
+  }, [app]);
 
   const handleMouseDown = (event: SplineEvent) => {
     const name = event.target?.name;
@@ -38,18 +54,25 @@ export default function HiveScene({
 
   return (
     <div className="relative h-full w-full">
-      {!isLoaded && <SceneSkeleton />}
+      {!app && <SceneSkeleton />}
       <Spline
         scene={SCENE_URL}
-        onLoad={() => setIsLoaded(true)}
+        onLoad={setApp}
         onSplineMouseDown={handleMouseDown}
         style={{
           width: "100%",
           height: "100%",
-          opacity: isLoaded ? 1 : 0,
+          opacity: app ? 1 : 0,
           transition: "opacity 400ms ease-out",
         }}
       />
+      {app && (
+        <NeuralPathways
+          app={app}
+          activeMember={activeMember}
+          memberActivity={memberActivity}
+        />
+      )}
     </div>
   );
 }

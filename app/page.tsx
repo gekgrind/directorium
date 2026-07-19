@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import HiveScene from "@/components/directorium/HiveScene";
 import BoardMemberPanel from "@/components/directorium/BoardMemberPanel";
 import {
   BOARD_MEMBERS,
   type BoardMemberSplineName,
 } from "@/components/directorium/board-members";
+import type { MemberActivity } from "@/components/directorium/NeuralPathways";
+import { useBoardMemberOutput } from "@/lib/directorium/use-board-member-output";
 
 export default function DirectoriumDashboardPage() {
   const [activeMember, setActiveMember] =
@@ -21,6 +23,16 @@ export default function DirectoriumDashboardPage() {
   }, []);
 
   const member = activeMember ? BOARD_MEMBERS[activeMember] : null;
+  const output = useBoardMemberOutput(activeMember);
+
+  // Live-session pathway activity: a member generating output pulses hard.
+  const memberActivity = useMemo<MemberActivity>(
+    () =>
+      activeMember && output.status === "loading"
+        ? { [activeMember]: 1 }
+        : {},
+    [activeMember, output.status],
+  );
 
   return (
     <div
@@ -31,6 +43,8 @@ export default function DirectoriumDashboardPage() {
       }}
     >
       <HiveScene
+        activeMember={activeMember}
+        memberActivity={memberActivity}
         onMemberClick={handleMemberClick}
         onDeselect={handleDeselect}
       />
@@ -41,7 +55,7 @@ export default function DirectoriumDashboardPage() {
         </div>
       )}
 
-      <BoardMemberPanel member={member} onClose={handleDeselect} />
+      <BoardMemberPanel member={member} output={output} onClose={handleDeselect} />
     </div>
   );
 }

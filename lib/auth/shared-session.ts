@@ -147,7 +147,7 @@ function extractAccessToken(value: unknown): string | null {
   );
 }
 
-function getStringMetadata(
+export function getStringMetadata(
   metadata: Record<string, unknown>,
   keys: readonly string[],
 ) {

@@ -1,36 +1,63 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { buildCentralLoginUrl } from "@/lib/auth/shared-session";
 import {
-  buildCentralLoginUrl,
-  fetchSharedAuthUser,
-  parseSharedSupabaseAccessToken,
-  SHARED_AUTH_COOKIE_NAME,
-} from "@/lib/auth/shared-session";
+  applySharedAuthCookieOptions,
+  getSharedAuthCookieOptions,
+} from "@/lib/supabase/shared-auth-cookie";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function proxy(request: NextRequest) {
   // The shared auth cookie is scoped to .entrepreneuria.io and is never sent
-  // to localhost, so skip the guard in local development.
-  const { hostname } = request.nextUrl;
+  // to localhost, so skip the guard in local development. Read the Host
+  // header rather than nextUrl.hostname — under self-hosted `next start`,
+  // nextUrl.hostname is always "localhost" regardless of the real host.
+  const hostname =
+    request.headers.get("host")?.split(":")[0]?.toLowerCase() ?? "";
   if (hostname === "localhost" || hostname === "127.0.0.1") {
     return NextResponse.next();
   }
 
-  const accessToken = parseSharedSupabaseAccessToken(
-    request.cookies.get(SHARED_AUTH_COOKIE_NAME)?.value,
-  );
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return NextResponse.redirect(
+      buildCentralLoginUrl(request.nextUrl.toString()),
+    );
+  }
 
-  if (accessToken && SUPABASE_URL && SUPABASE_ANON_KEY) {
-    const user = await fetchSharedAuthUser({
-      accessToken,
-      supabaseUrl: SUPABASE_URL,
-      anonKey: SUPABASE_ANON_KEY,
-    });
+  let response = NextResponse.next({ request });
 
-    if (user) {
-      return NextResponse.next();
-    }
+  const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookieOptions: getSharedAuthCookieOptions(),
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => {
+          request.cookies.set(name, value);
+        });
+
+        response = NextResponse.next({ request });
+
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(
+            name,
+            value,
+            applySharedAuthCookieOptions(options),
+          );
+        });
+      },
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    return response;
   }
 
   return NextResponse.redirect(buildCentralLoginUrl(request.nextUrl.toString()));

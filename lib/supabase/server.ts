@@ -1,10 +1,14 @@
 import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 import { DEFAULT_SETTINGS_INPUT, sanitizeSettingsInput, type UserSettings } from "@/lib/settings/types";
 import {
-  fetchSharedAuthUser,
-  parseSharedSupabaseAccessToken,
-  SHARED_AUTH_COOKIE_NAME,
+  getStringMetadata,
+  type SharedAuthUser,
 } from "@/lib/auth/shared-session";
+import {
+  applySharedAuthCookieOptions,
+  getSharedAuthCookieOptions,
+} from "@/lib/supabase/shared-auth-cookie";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -18,23 +22,61 @@ const getRequiredEnv = (name: string, value: string | undefined) => {
   return value;
 };
 
-export const getSharedAccessTokenFromCookies = async () => {
-  const cookieStore = await cookies();
-  return parseSharedSupabaseAccessToken(
-    cookieStore.get(SHARED_AUTH_COOKIE_NAME)?.value,
-  );
-};
-
-export const getCurrentSharedAuthUser = async () => {
+const createSharedServerClient = async () => {
   const supabaseUrl = getRequiredEnv("NEXT_PUBLIC_SUPABASE_URL", SUPABASE_URL);
   const anonKey = getRequiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", SUPABASE_ANON_KEY);
-  const accessToken = await getSharedAccessTokenFromCookies();
+  const cookieStore = await cookies();
 
-  if (!accessToken) {
+  return createServerClient(supabaseUrl, anonKey, {
+    cookieOptions: getSharedAuthCookieOptions(),
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, applySharedAuthCookieOptions(options));
+          });
+        } catch {
+          // Server Components cannot write cookies; session refresh is
+          // handled by the proxy.
+        }
+      },
+    },
+  });
+};
+
+export const getSharedAccessTokenFromCookies = async () => {
+  const supabase = await createSharedServerClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  return session?.access_token ?? null;
+};
+
+export const getCurrentSharedAuthUser = async (): Promise<SharedAuthUser | null> => {
+  const supabase = await createSharedServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
     return null;
   }
 
-  return fetchSharedAuthUser({ accessToken, supabaseUrl, anonKey });
+  const metadata =
+    user.user_metadata && typeof user.user_metadata === "object"
+      ? (user.user_metadata as Record<string, unknown>)
+      : {};
+
+  return {
+    id: user.id,
+    email: user.email ?? null,
+    name: getStringMetadata(metadata, ["full_name", "name", "display_name"]),
+    avatarUrl: getStringMetadata(metadata, ["avatar_url", "picture"]),
+  };
 };
 
 export const getAuthenticatedSupabaseUserId = async () => {
